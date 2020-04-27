@@ -375,7 +375,7 @@ public class DefaultOCFLObjectSession implements OCFLObjectSession {
             headers.setInteractionModel(BASIC_CONTAINER.getURI());
             headers.setParent(FedoraId.getRepositoryRootId().getFullId());
 
-            if (versionDesc.getVersionId() == VersionId.V1) {
+            if (VersionId.V1.equals(versionDesc.getVersionId())) {
                 headers.setCreatedBy(getCreatedBy(versionDesc.getCommitInfo()));
                 headers.setCreatedDate(versionDesc.getCreated().toInstant());
             } else {
