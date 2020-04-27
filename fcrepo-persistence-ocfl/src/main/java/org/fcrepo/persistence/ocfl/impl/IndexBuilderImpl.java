@@ -126,6 +126,7 @@ public class IndexBuilderImpl implements IndexBuilder {
                         final var fedoraId = FedoraId.create(ocflId);
                         fedoraToOCFLObjectIndex.addMapping(fedoraId.getFullId(), fedoraId.getFullId(), ocflId);
 
+                        // TODO this is missing paths that once existed but are not currently in HEAD
                         try (final var vanillaPaths = objSession.listHeadSubpaths()) {
                             vanillaPaths.forEach(path -> {
                                 fedoraToOCFLObjectIndex.addMapping(fedoraId.resolve(path).getFullId(),
