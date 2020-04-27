@@ -18,6 +18,7 @@
 
 package org.fcrepo.persistence.ocfl.api;
 
+import org.fcrepo.kernel.api.models.ResourceHeaders;
 import org.fcrepo.persistence.api.CommitOption;
 import org.fcrepo.persistence.api.WriteOutcome;
 import org.fcrepo.persistence.api.exceptions.PersistentStorageException;
@@ -78,6 +79,8 @@ public interface OCFLObjectSession {
      * @throws PersistentStorageException if unable to read the file
      */
     InputStream read(String subpath, String version) throws PersistentStorageException;
+
+    ResourceHeaders readResourceHeaders(String subpath, String version) throws PersistentStorageException;
 
     /**
      * Overrides the default {@link CommitOption} to use when the session is committed. By default, is

@@ -17,26 +17,6 @@
  */
 package org.fcrepo.persistence.ocfl.impl;
 
-import static java.lang.String.format;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static org.fcrepo.kernel.api.RdfLexicon.NON_RDF_SOURCE;
-import static org.fcrepo.persistence.api.CommitOption.NEW_VERSION;
-import static org.fcrepo.persistence.common.ResourceHeaderSerializationUtils.deserializeHeaders;
-import static org.fcrepo.persistence.ocfl.impl.OCFLPersistentStorageUtils.getSidecarSubpath;
-import static org.fcrepo.persistence.ocfl.impl.OCFLPersistentStorageUtils.resolveExtensions;
-import static org.fcrepo.persistence.ocfl.impl.OCFLPersistentStorageUtils.resolveVersionId;
-import static org.fcrepo.persistence.ocfl.impl.OCFLPersistentStorageUtils.getBinaryStream;
-import static org.fcrepo.persistence.ocfl.impl.OCFLPersistentStorageUtils.getRdfStream;
-import static org.fcrepo.persistence.ocfl.impl.OCFLPersistentStorageUtils.resovleOCFLSubpathFromResourceId;
-
-import java.io.InputStream;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-
 import org.fcrepo.kernel.api.RdfStream;
 import org.fcrepo.kernel.api.models.ResourceHeaders;
 import org.fcrepo.kernel.api.operations.ResourceOperation;
@@ -52,9 +32,28 @@ import org.fcrepo.persistence.ocfl.api.Persister;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.InputStream;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeoutException;
+
+import static java.lang.String.format;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.fcrepo.kernel.api.RdfLexicon.NON_RDF_SOURCE;
+import static org.fcrepo.persistence.api.CommitOption.NEW_VERSION;
+import static org.fcrepo.persistence.common.ResourceHeaderSerializationUtils.deserializeHeaders;
+import static org.fcrepo.persistence.ocfl.impl.OCFLPersistentStorageUtils.getBinaryStream;
+import static org.fcrepo.persistence.ocfl.impl.OCFLPersistentStorageUtils.getRdfStream;
+import static org.fcrepo.persistence.ocfl.impl.OCFLPersistentStorageUtils.getSidecarSubpath;
+import static org.fcrepo.persistence.ocfl.impl.OCFLPersistentStorageUtils.resolveExtensions;
+import static org.fcrepo.persistence.ocfl.impl.OCFLPersistentStorageUtils.resolveVersionId;
+import static org.fcrepo.persistence.ocfl.impl.OCFLPersistentStorageUtils.resovleOCFLSubpathFromResourceId;
 
 
 
@@ -191,16 +190,26 @@ public class OCFLPersistentStorageSession implements PersistentStorageSession {
         final var rootIdentifier = mapping.getRootObjectIdentifier();
         final var ocflSubpath = resovleOCFLSubpathFromResourceId(rootIdentifier, identifier);
         final var sidecarSubpath = getSidecarSubpath(ocflSubpath);
+        String versionId = null;
 
-        final InputStream headerStream;
         if (version != null) {
-            final var versionId = resolveVersionId(objSession, version);
-            headerStream = objSession.read(sidecarSubpath, versionId);
-        } else {
-            headerStream = objSession.read(sidecarSubpath);
+            versionId = resolveVersionId(objSession, version);
         }
 
-        return deserializeHeaders(headerStream);
+        try {
+            final InputStream headerStream;
+            if (version != null) {
+                headerStream = objSession.read(sidecarSubpath, versionId);
+            } else {
+                headerStream = objSession.read(sidecarSubpath);
+            }
+
+            return deserializeHeaders(headerStream);
+        } catch (final PersistentItemNotFoundException e) {
+            // could not find the sidecar file -- attempt to load as a vanilla ocfl object
+            final var subpath = OCFLPersistentStorageUtils.relativizeSubpath(rootIdentifier, identifier);
+            return objSession.readResourceHeaders(subpath, versionId);
+        }
     }
 
     private FedoraOCFLMapping getFedoraOCFLMapping(final String identifier) throws PersistentStorageException {

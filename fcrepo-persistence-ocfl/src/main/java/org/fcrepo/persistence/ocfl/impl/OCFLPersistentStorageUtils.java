@@ -127,6 +127,7 @@ public class OCFLPersistentStorageUtils {
      * @param fedoraSubpath subpath of file within ocfl object
      * @return The resolved OCFL subpath
      */
+    // TODO this method is incorrect for vanilla objects
     public static  String resolveOCFLSubpath(final String rootObjectId, final String fedoraSubpath) {
         final var lastPathSegment = rootObjectId.substring(rootObjectId.lastIndexOf("/") + 1);
 
@@ -242,15 +243,19 @@ public class OCFLPersistentStorageUtils {
                                          final OCFLObjectSession objSession,
                                          final String subpath,
                                          final Instant version) throws PersistentStorageException {
+        final Model model = createDefaultModel();
+        final String topic = resolveTopic(identifier);
         final String versionId = resolveVersionId(objSession, version);
+
         try (final InputStream is = readFile(objSession, subpath, versionId)) {
-            final Model model = createDefaultModel();
             RDFDataMgr.read(model, is, DEFAULT_RDF_FORMAT.getLang());
-            final String topic = resolveTopic(identifier);
-            return DefaultRdfStream.fromModel(createURI(topic), model);
+        } catch (final PersistentItemNotFoundException ex) {
+            // TODO ignore this and assume that it's a vanilla object
         } catch (final IOException ex) {
             throw new PersistentStorageException(format("unable to read %s ;  version = %s", identifier, version), ex);
         }
+
+        return DefaultRdfStream.fromModel(createURI(topic), model);
     }
 
     /**

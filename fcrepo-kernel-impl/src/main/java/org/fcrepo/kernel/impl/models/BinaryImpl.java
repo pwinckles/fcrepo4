@@ -29,7 +29,6 @@ import org.fcrepo.kernel.api.Transaction;
 import org.fcrepo.kernel.api.exception.InvalidChecksumException;
 import org.fcrepo.kernel.api.exception.ItemNotFoundException;
 import org.fcrepo.kernel.api.exception.PathNotFoundException;
-import org.fcrepo.kernel.api.exception.PathNotFoundRuntimeException;
 import org.fcrepo.kernel.api.exception.RepositoryRuntimeException;
 import org.fcrepo.kernel.api.identifiers.FedoraId;
 import org.fcrepo.kernel.api.models.Binary;
@@ -144,7 +143,8 @@ public class BinaryImpl extends FedoraResourceImpl implements Binary {
             }
             return resourceFactory.getResource(tx, descId);
         } catch (final PathNotFoundException e) {
-            throw new PathNotFoundRuntimeException(e);
+            // TODO is this valid? a vanilla object doesn't have a description
+            return null;
         }
     }
 

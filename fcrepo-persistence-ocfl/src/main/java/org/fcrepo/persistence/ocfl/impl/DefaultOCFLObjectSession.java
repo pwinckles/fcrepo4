@@ -17,24 +17,35 @@
  */
 package org.fcrepo.persistence.ocfl.impl;
 
+import com.google.common.base.Strings;
 import edu.wisc.library.ocfl.api.MutableOcflRepository;
 import edu.wisc.library.ocfl.api.OcflObjectUpdater;
 import edu.wisc.library.ocfl.api.exception.NotFoundException;
 import edu.wisc.library.ocfl.api.model.CommitInfo;
+import edu.wisc.library.ocfl.api.model.FileChange;
+import edu.wisc.library.ocfl.api.model.FileChangeHistory;
 import edu.wisc.library.ocfl.api.model.FileChangeType;
 import edu.wisc.library.ocfl.api.model.FileDetails;
 import edu.wisc.library.ocfl.api.model.ObjectVersionId;
 import edu.wisc.library.ocfl.api.model.VersionDetails;
 import edu.wisc.library.ocfl.api.model.VersionId;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
+import org.apache.tika.config.TikaConfig;
+import org.apache.tika.detect.Detector;
+import org.apache.tika.io.TikaInputStream;
+import org.apache.tika.metadata.Metadata;
+import org.fcrepo.kernel.api.identifiers.FedoraId;
+import org.fcrepo.kernel.api.models.ResourceHeaders;
 import org.fcrepo.persistence.api.CommitOption;
 import org.fcrepo.persistence.api.WriteOutcome;
 import org.fcrepo.persistence.api.exceptions.PersistentItemNotFoundException;
 import org.fcrepo.persistence.api.exceptions.PersistentSessionClosedException;
 import org.fcrepo.persistence.api.exceptions.PersistentStorageException;
 import org.fcrepo.persistence.common.FileWriteOutcome;
+import org.fcrepo.persistence.common.ResourceHeadersImpl;
 import org.fcrepo.persistence.ocfl.api.OCFLObjectSession;
 import org.fcrepo.persistence.ocfl.api.OCFLVersion;
 import org.slf4j.Logger;
@@ -44,6 +55,8 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.net.URI;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -66,6 +79,8 @@ import java.util.stream.Stream;
 import static edu.wisc.library.ocfl.api.OcflOption.MOVE_SOURCE;
 import static edu.wisc.library.ocfl.api.OcflOption.OVERWRITE;
 import static java.lang.String.format;
+import static org.fcrepo.kernel.api.RdfLexicon.BASIC_CONTAINER;
+import static org.fcrepo.kernel.api.RdfLexicon.NON_RDF_SOURCE;
 import static org.fcrepo.persistence.api.CommitOption.NEW_VERSION;
 
 /**
@@ -95,6 +110,9 @@ public class DefaultOCFLObjectSession implements OCFLObjectSession {
     private CommitOption commitOption;
 
     private Instant created;
+
+    private Detector mimeDetector;
+
     /**
      * Instantiate an OCFL object session
      *
@@ -113,6 +131,13 @@ public class DefaultOCFLObjectSession implements OCFLObjectSession {
         this.objectDeleted = false;
         this.sessionClosed = false;
         this.created = Instant.now();
+
+        // TODO should be singleton
+        try {
+            this.mimeDetector = new TikaConfig().getDetector();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private String encode(final String value) {
@@ -318,6 +343,119 @@ public class DefaultOCFLObjectSession implements OCFLObjectSession {
                     "Unable to read %s from object %s version %s, object was not found.",
                     subpath, objectIdentifier, version.getVersionId()), e);
         }
+    }
+
+    // TODO this only works for files that have already been committed to the OCFL object
+    // TODO for now, if subpath empty means the object itself
+    @Override
+    public ResourceHeaders readResourceHeaders(final String subpath, final String version)
+            throws PersistentStorageException {
+        assertSessionOpen();
+
+        final var encodedSubpath = Strings.isNullOrEmpty(subpath) ? null : encode(subpath);
+        final var isRootRef = encodedSubpath == null;
+
+        // If the object was deleted, then only uncommitted staged files can be available
+        if (objectDeleted) {
+            throw new PersistentItemNotFoundException(format("Could not find %s within object %s",
+                    subpath, objectIdentifier));
+        }
+
+        final var versionId = version == null ? ObjectVersionId.head(objectIdentifier) :
+                ObjectVersionId.version(objectIdentifier, version);
+
+        final var versionDesc = ocflRepository.describeVersion(versionId);
+
+        final var headers = new ResourceHeadersImpl();
+        headers.setArchivalGroup(isRootRef);
+        headers.setObjectRoot(isRootRef);
+
+        if (isRootRef) {
+            headers.setId("info:fedora/" + objectIdentifier);
+            headers.setInteractionModel(BASIC_CONTAINER.getURI());
+            headers.setParent(FedoraId.getRepositoryRootId().getFullId());
+
+            if (versionDesc.getVersionId() == VersionId.V1) {
+                headers.setCreatedBy(getCreatedBy(versionDesc.getCommitInfo()));
+                headers.setCreatedDate(versionDesc.getCreated().toInstant());
+            } else {
+                final var v1 = ocflRepository.describeVersion(ObjectVersionId.version(objectIdentifier, VersionId.V1));
+                headers.setCreatedBy(getCreatedBy(v1.getCommitInfo()));
+                headers.setCreatedDate(v1.getCreated().toInstant());
+            }
+
+            headers.setLastModifiedBy(getCreatedBy(versionDesc.getCommitInfo()));
+            headers.setLastModifiedDate(versionDesc.getCreated().toInstant());
+        } else {
+
+            final FileChangeHistory fileHistory;
+
+            try {
+                 fileHistory = ocflRepository.fileChangeHistory(objectIdentifier, encodedSubpath);
+            } catch (NotFoundException e) {
+                throw new PersistentItemNotFoundException(format("Could not find %s within object %s",
+                        subpath, objectIdentifier));
+            }
+
+            headers.setId("info:fedora/" + objectIdentifier + "/" + subpath);
+            headers.setInteractionModel(NON_RDF_SOURCE.getURI());
+            headers.setParent("info:fedora/" + objectIdentifier);
+            headers.setFilename(subpath.substring(Math.max(subpath.lastIndexOf("/"), 0)));
+
+            final var mostRecentChange = findNearestVersion(versionDesc.getVersionId(), fileHistory);
+
+            headers.setCreatedBy(getCreatedBy(fileHistory.getOldest().getCommitInfo()));
+            headers.setCreatedDate(fileHistory.getOldest().getTimestamp().toInstant());
+            headers.setLastModifiedBy(getCreatedBy(mostRecentChange.getCommitInfo()));
+            headers.setLastModifiedDate(mostRecentChange.getTimestamp().toInstant());
+
+            // May have been deleted in the requested version
+            if (versionDesc.containsFile(encodedSubpath)) {
+                final var fileDesc = versionDesc.getFile(encodedSubpath);
+                final var storagePath = new OCFLConstants().getStorageRootDir().toPath()
+                        .resolve(versionDesc.getFile(encodedSubpath).getStorageRelativePath());
+
+                try {
+                    headers.setFilename(storagePath.getFileName().toString());
+                    headers.setContentSize(Files.size(storagePath));
+
+                    final var meta = new Metadata();
+                    meta.set(Metadata.RESOURCE_NAME_KEY, storagePath.getFileName().toString());
+                    final var mediaType = mimeDetector.detect(TikaInputStream.get(storagePath), meta);
+                    headers.setMimeType(mediaType.toString());
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+
+                headers.setDigests(fileDesc.getFixity().entrySet().stream()
+                        .map(entry -> URI.create(entry.getKey().getOcflName() + ":" + entry.getValue()))
+                        .collect(Collectors.toList()));
+            }
+        }
+
+        headers.setStateToken(DigestUtils.md5Hex(
+                String.valueOf(headers.getLastModifiedDate().toEpochMilli())).toUpperCase());
+
+        return headers;
+    }
+
+    private FileChange findNearestVersion(final VersionId requestedVersion, final FileChangeHistory changeHistory) {
+        FileChange previousChange = null;
+
+        for (var it = changeHistory.getForwardChangeIterator(); it.hasNext();) {
+            final var change = it.next();
+            final var version = change.getVersionId();
+
+            if (version.equals(requestedVersion)) {
+                return change;
+            } else if (version.compareTo(requestedVersion) > 0) {
+                return previousChange;
+            } else {
+                previousChange = change;
+            }
+        }
+
+        return previousChange;
     }
 
     /**

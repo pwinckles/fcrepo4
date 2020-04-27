@@ -121,20 +121,32 @@ public class IndexBuilderImpl implements IndexBuilder {
                         }
                     });
 
-                    // if a resource is not an AG then there should only be a single resource per OCFL object
-                    if (fedoraIds.size() == 1 && rootId.get() == null) {
-                        rootId.set(fedoraIds.get(0));
-                    }
+                    // Vanilla object -- or corrupted F6 object...
+                    if (fedoraIds.isEmpty()) {
+                        final var fedoraId = FedoraId.create(ocflId);
+                        fedoraToOCFLObjectIndex.addMapping(fedoraId.getFullId(), fedoraId.getFullId(), ocflId);
 
-                    fedoraIds.forEach(fedoraIdentifier -> {
-                        var rootFedoraIdentifier = rootId.get();
-                        if (rootFedoraIdentifier == null) {
-                            rootFedoraIdentifier = fedoraIdentifier;
+                        try (final var vanillaPaths = objSession.listHeadSubpaths()) {
+                            vanillaPaths.forEach(path -> {
+                                fedoraToOCFLObjectIndex.addMapping(fedoraId.resolve(path).getFullId(),
+                                        fedoraId.getFullId(), ocflId);
+                            });
                         }
-                        fedoraToOCFLObjectIndex.addMapping(fedoraIdentifier, rootFedoraIdentifier, ocflId);
-                        LOGGER.debug("Rebuilt fedora-to-ocfl object index entry for {}", fedoraIdentifier);
-                    });
+                    } else {
+                        // if a resource is not an AG then there should only be a single resource per OCFL object
+                        if (fedoraIds.size() == 1 && rootId.get() == null) {
+                            rootId.set(fedoraIds.get(0));
+                        }
 
+                        fedoraIds.forEach(fedoraIdentifier -> {
+                            var rootFedoraIdentifier = rootId.get();
+                            if (rootFedoraIdentifier == null) {
+                                rootFedoraIdentifier = fedoraIdentifier;
+                            }
+                            fedoraToOCFLObjectIndex.addMapping(fedoraIdentifier, rootFedoraIdentifier, ocflId);
+                            LOGGER.debug("Rebuilt fedora-to-ocfl object index entry for {}", fedoraIdentifier);
+                        });
+                    }
                 } catch (final PersistentStorageException e) {
                     throw new RepositoryRuntimeException("Failed to rebuild fedora-to-ocfl index: " +
                             e.getMessage(), e);
