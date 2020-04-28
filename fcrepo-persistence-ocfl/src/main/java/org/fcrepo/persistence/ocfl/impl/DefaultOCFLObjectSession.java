@@ -27,6 +27,7 @@ import edu.wisc.library.ocfl.api.model.FileChangeHistory;
 import edu.wisc.library.ocfl.api.model.FileChangeType;
 import edu.wisc.library.ocfl.api.model.FileDetails;
 import edu.wisc.library.ocfl.api.model.ObjectVersionId;
+import edu.wisc.library.ocfl.api.model.User;
 import edu.wisc.library.ocfl.api.model.VersionDetails;
 import edu.wisc.library.ocfl.api.model.VersionId;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -345,6 +346,18 @@ public class DefaultOCFLObjectSession implements OCFLObjectSession {
         }
     }
 
+    public boolean isVanillaObject() {
+        if (ocflRepository.containsObject(objectIdentifier)) {
+            for (var file : ocflRepository.describeVersion(ObjectVersionId.head(objectIdentifier)).getFiles()) {
+                if (file.getPath().startsWith(".fcrepo")) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
     // TODO this only works for files that have already been committed to the OCFL object
     // TODO for now, if subpath empty means the object itself
     @Override
@@ -486,7 +499,7 @@ public class DefaultOCFLObjectSession implements OCFLObjectSession {
      * {@inheritDoc}
      */
     @Override
-    public synchronized String commit() throws PersistentStorageException {
+    public synchronized String commit(final String userPrincipal) throws PersistentStorageException {
         assertSessionOpen();
 
         if (commitOption == null) {
@@ -508,9 +521,9 @@ public class DefaultOCFLObjectSession implements OCFLObjectSession {
 
         // Determine if a new object needs to be created
         if (isNewObject()) {
-            return commitNewObject(commitOption);
+            return commitNewObject(commitOption, userPrincipal);
         } else {
-            return commitUpdates(commitOption);
+            return commitUpdates(commitOption, userPrincipal);
         }
     }
 
@@ -518,8 +531,9 @@ public class DefaultOCFLObjectSession implements OCFLObjectSession {
         ocflRepository.purgeObject(objectIdentifier);
     }
 
-    private String commitNewObject(final CommitOption commitOption) throws PersistentStorageException {
-        final var commitInfo = new CommitInfo().setMessage("initial commit");
+    private String commitNewObject(final CommitOption commitOption, final String userPrincipal)
+            throws PersistentStorageException {
+        final var commitInfo = new CommitInfo().setUser(new User().setName(userPrincipal)).setMessage("initial commit");
 
         // Prevent creation of empty OCFL objects
         if (isStagingEmpty()) {
@@ -542,13 +556,15 @@ public class DefaultOCFLObjectSession implements OCFLObjectSession {
         }
     }
 
-    private String commitUpdates(final CommitOption commitOption) {
+    private String commitUpdates(final CommitOption commitOption, final String userPrincipal) {
         // Nothing to do if there are no staged files, no deletes, and not committing the mutable HEAD
         if (isStagingEmpty() && deletePaths.isEmpty() &&
                 !(commitOption == NEW_VERSION && ocflRepository.hasStagedChanges(objectIdentifier))) {
             return ocflRepository.describeVersion(ObjectVersionId.head(objectIdentifier))
                     .getVersionId().toString();
         }
+
+        final var commitInfo = new CommitInfo().setUser(new User().setName(userPrincipal)).setMessage("update");
 
         // Updater which pushes all updated files and then performs queued deletes
         final Consumer<OcflObjectUpdater> commitChangeUpdater = updater -> {
@@ -563,21 +579,21 @@ public class DefaultOCFLObjectSession implements OCFLObjectSession {
             if (ocflRepository.hasStagedChanges(objectIdentifier)) {
                 // Persist the current changes to the mutable head, and then commit the head as a version
                 ocflRepository.stageChanges(ObjectVersionId.head(objectIdentifier),
-                        null,
+                        commitInfo,
                         commitChangeUpdater);
                 return ocflRepository.commitStagedChanges(objectIdentifier, null)
                         .getVersionId().toString();
             } else {
                 // Commit directly to a new version
                 return ocflRepository.updateObject(ObjectVersionId.head(objectIdentifier),
-                        null,
+                        commitInfo,
                         commitChangeUpdater)
                         .getVersionId().toString();
             }
         } else {
             // perform commit to mutable head version
             return ocflRepository.stageChanges(ObjectVersionId.head(objectIdentifier),
-                    null,
+                    commitInfo,
                     commitChangeUpdater)
                     .getVersionId().toString();
         }

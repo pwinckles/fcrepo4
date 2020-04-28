@@ -64,6 +64,8 @@ public class TransactionImpl implements Transaction {
 
     private String userAgent;
 
+    private String userPrincipal;
+
     protected TransactionImpl(final String id, final TransactionManagerImpl txManager) {
         if (id == null || id.isEmpty()) {
             throw new IllegalArgumentException("Transaction id should not be empty!");
@@ -82,7 +84,7 @@ public class TransactionImpl implements Transaction {
         }
         try {
             log.debug("Committing transaction {}", id);
-            this.getPersistentSession().commit();
+            this.getPersistentSession().commit(userPrincipal);
             this.getContainmentIndex().commitTransaction(this);
             this.getEventAccumulator().emitEvents(id, baseUri, userAgent);
             this.committed = true;
@@ -184,6 +186,11 @@ public class TransactionImpl implements Transaction {
     @Override
     public void setUserAgent(final String userAgent) {
         this.userAgent = userAgent;
+    }
+
+    @Override
+    public void setUserPrincipal(final String userPrincipal) {
+        this.userPrincipal = userPrincipal;
     }
 
     private Duration timeout() {

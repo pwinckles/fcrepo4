@@ -35,6 +35,10 @@ import java.util.stream.Stream;
  */
 public interface OCFLObjectSession {
 
+    boolean isVanillaObject();
+
+    ResourceHeaders readResourceHeaders(String subpath, String version) throws PersistentStorageException;
+
     /**
      * Write the provided content to specified subpath.
      *
@@ -80,8 +84,6 @@ public interface OCFLObjectSession {
      */
     InputStream read(String subpath, String version) throws PersistentStorageException;
 
-    ResourceHeaders readResourceHeaders(String subpath, String version) throws PersistentStorageException;
-
     /**
      * Overrides the default {@link CommitOption} to use when the session is committed. By default, is
      * {@link CommitOption#UNVERSIONED} when fcrepo.autoversioning.enabled is false,
@@ -109,7 +111,7 @@ public interface OCFLObjectSession {
      * @return identifier of the version committed
      * @throws PersistentStorageException if unable to commit
      */
-    String commit() throws PersistentStorageException;
+    String commit(String userPrincipal) throws PersistentStorageException;
 
     /**
      * Close this session without committing changes.

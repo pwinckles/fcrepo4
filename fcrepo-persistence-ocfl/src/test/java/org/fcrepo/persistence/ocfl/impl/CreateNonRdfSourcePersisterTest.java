@@ -277,7 +277,8 @@ public class CreateNonRdfSourcePersisterTest {
     }
 
     private void mockSessionWriteConsumeStream() throws Exception {
-        when(session.write(eq("child"), any(InputStream.class))).thenAnswer(new Answer<WriteOutcome>() {
+        when(session.write(eq("child"), any(InputStream.class)))
+                .thenAnswer(new Answer<WriteOutcome>() {
             @Override
             public WriteOutcome answer(final InvocationOnMock invocation) throws Throwable {
                 // Consume the input stream

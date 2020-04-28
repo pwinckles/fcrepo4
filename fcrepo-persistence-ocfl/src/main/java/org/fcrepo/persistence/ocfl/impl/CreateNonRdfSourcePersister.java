@@ -21,6 +21,7 @@ import org.fcrepo.kernel.api.operations.CreateResourceOperation;
 import org.fcrepo.kernel.api.operations.NonRdfSourceOperation;
 import org.fcrepo.kernel.api.operations.ResourceOperation;
 import org.fcrepo.persistence.api.exceptions.PersistentStorageException;
+import org.fcrepo.persistence.ocfl.api.FedoraOCFLMappingNotFoundException;
 import org.fcrepo.persistence.ocfl.api.FedoraToOCFLObjectIndex;
 import org.fcrepo.persistence.ocfl.api.OCFLObjectSession;
 import org.slf4j.Logger;
@@ -55,9 +56,17 @@ class CreateNonRdfSourcePersister extends AbstractNonRdfSourcePersister {
         final boolean archivalGroup = createResourceOp.isArchivalGroup();
         final String rootObjectId = archivalGroup ? createResourceOp.getResourceId() :
                 resolveRootObjectId(createResourceOp, session);
-        final String ocflId = mintOCFLObjectId(rootObjectId);
-        final OCFLObjectSession ocflObjectSession = session.findOrCreateSession(ocflId);
+
+        String ocflObjectId;
+
+        try {
+            ocflObjectId = index.getMapping(rootObjectId).getOcflObjectId();
+        } catch (FedoraOCFLMappingNotFoundException e) {
+            ocflObjectId = mintOCFLObjectId(rootObjectId);
+        }
+
+        final OCFLObjectSession ocflObjectSession = session.findOrCreateSession(ocflObjectId);
         persistNonRDFSource(operation, ocflObjectSession, rootObjectId);
-        index.addMapping(resourceId, rootObjectId, ocflId);
+        index.addMapping(resourceId, rootObjectId, ocflObjectId);
     }
 }

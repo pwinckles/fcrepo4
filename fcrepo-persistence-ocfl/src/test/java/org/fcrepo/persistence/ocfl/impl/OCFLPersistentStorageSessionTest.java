@@ -225,7 +225,7 @@ public class OCFLPersistentStorageSessionTest {
         assertNotNull("Headers must contain modified date", originalModifiedDate);
 
         //commit to OCFL
-        session.commit();
+        session.commit(USER_PRINCIPAL);
 
         //create a new session and verify that the state is the same
         final OCFLPersistentStorageSession newSession = createSession(index, objectSessionFactory);
@@ -266,7 +266,7 @@ public class OCFLPersistentStorageSessionTest {
         session.persist(rdfSourceOperation);
 
         //commit to OCFL
-        session.commit();
+        session.commit(USER_PRINCIPAL);
 
         //create a new session and verify the returned rdf stream.
         final OCFLPersistentStorageSession newSession = createSession(index, objectSessionFactory);
@@ -286,7 +286,7 @@ public class OCFLPersistentStorageSessionTest {
         session.persist(rdfSourceOperation);
 
         //commit to OCFL
-        session.commit();
+        session.commit(USER_PRINCIPAL);
 
         //this should fail
         try {
@@ -306,7 +306,7 @@ public class OCFLPersistentStorageSessionTest {
         session.persist(rdfSourceOperation);
 
         //commit to OCFL
-        session.commit();
+        session.commit(USER_PRINCIPAL);
 
         //this should fail
         try {
@@ -326,11 +326,11 @@ public class OCFLPersistentStorageSessionTest {
         session.persist(rdfSourceOperation);
 
         //commit to OCFL
-        session.commit();
+        session.commit(USER_PRINCIPAL);
 
         //this should fail
         try {
-            session.commit();
+            session.commit(USER_PRINCIPAL);
             fail("second session.commit(...) invocation should have failed.");
         } catch (final PersistentStorageException ex) {
             //expected failure
@@ -376,11 +376,11 @@ public class OCFLPersistentStorageSessionTest {
 
         //mock success on commit for the first object session
         when(mockSessionFactory.create(eq(ocflId1), anyString())).thenReturn(objectSession1);
-        when(objectSession1.commit()).thenReturn(Instant.now().toString());
+        when(objectSession1.commit(USER_PRINCIPAL)).thenReturn(Instant.now().toString());
         mockOCFLObjectSession(objectSession1, UNVERSIONED);
         //mock failure on commit for the second object session
         when(mockSessionFactory.create(eq(ocflId2), anyString())).thenReturn(objectSession2);
-        when(objectSession2.commit()).thenThrow(PersistentStorageException.class);
+        when(objectSession2.commit(USER_PRINCIPAL)).thenThrow(PersistentStorageException.class);
         mockOCFLObjectSession(objectSession2, UNVERSIONED);
 
         final PersistentStorageSession session1 = createSession(index, mockSessionFactory);
@@ -395,7 +395,7 @@ public class OCFLPersistentStorageSessionTest {
 
         //get triples should now fail because the session is effectively closed.
         try {
-            session1.commit();
+            session1.commit(USER_PRINCIPAL);
             fail("session1.commit(...) invocation should fail.");
         } catch (final PersistentStorageException ex) {
             //attempted rollback should also fail:
@@ -419,7 +419,7 @@ public class OCFLPersistentStorageSessionTest {
         when(mockSessionFactory.create(eq(ocflId), anyString())).thenReturn(objectSession1);
         mockOCFLObjectSession(objectSession1, UNVERSIONED);
         //pause on commit for 1 second
-        when(objectSession1.commit()).thenAnswer((Answer<String>) invocationOnMock -> {
+        when(objectSession1.commit(USER_PRINCIPAL)).thenAnswer((Answer<String>) invocationOnMock -> {
             Thread.sleep(1000);
             return null;
         });
@@ -435,7 +435,7 @@ public class OCFLPersistentStorageSessionTest {
         final CountDownLatch latch = new CountDownLatch(1);
         new Thread(() -> {
             try {
-                session1.commit();
+                session1.commit(USER_PRINCIPAL);
             } catch (final PersistentStorageException e) {
                 fail("The commit() should not fail.");
             } finally {
@@ -456,7 +456,7 @@ public class OCFLPersistentStorageSessionTest {
 
         latch.await(1000, TimeUnit.MILLISECONDS);
 
-        verify(objectSession1).commit();
+        verify(objectSession1).commit(USER_PRINCIPAL);
     }
 
     @Test
@@ -481,7 +481,7 @@ public class OCFLPersistentStorageSessionTest {
         }
 
         try {
-            session1.commit();
+            session1.commit(USER_PRINCIPAL);
             fail("Operation should have failed.");
         } catch (final PersistentStorageException e) {
             //do nothing
@@ -502,7 +502,7 @@ public class OCFLPersistentStorageSessionTest {
         //persist the operation
         try {
             session1.persist(rdfSourceOperation);
-            session1.commit();
+            session1.commit(USER_PRINCIPAL);
         } catch (final PersistentStorageException e) {
             fail("Operation should not fail.");
         }
@@ -536,7 +536,7 @@ public class OCFLPersistentStorageSessionTest {
         mockMappingAndIndex(ocflId, RESOURCE_ID, ROOT_OBJECT_ID, mapping);
         mockResourceOperation(rdfSourceOperation, RESOURCE_ID);
         when(mockSessionFactory.create(eq(ocflId), anyString())).thenReturn(objectSession1);
-        doThrow(new PersistentStorageException("commit error")).when(objectSession1).commit();
+        doThrow(new PersistentStorageException("commit error")).when(objectSession1).commit(USER_PRINCIPAL);
         mockOCFLObjectSession(objectSession1, NEW_VERSION);
         final PersistentStorageSession session1 = createSession(index, mockSessionFactory);
         try {
@@ -546,7 +546,7 @@ public class OCFLPersistentStorageSessionTest {
         }
 
         try {
-            session1.commit();
+            session1.commit(USER_PRINCIPAL);
             fail("Operation should fail.");
         } catch (final PersistentStorageException e) {
             //expected failure
@@ -596,7 +596,7 @@ public class OCFLPersistentStorageSessionTest {
         session.persist(rdfSourceOperation);
 
         //commit to new version
-        session.commit();
+        session.commit(USER_PRINCIPAL);
 
 
         //create a new session and verify that the state is the same
@@ -630,7 +630,7 @@ public class OCFLPersistentStorageSessionTest {
 
         mockResourceOperation(createArchivalGroupOperation, RESOURCE_ID);
         session.persist(createArchivalGroupOperation);
-        session.commit();
+        session.commit(USER_PRINCIPAL);
 
         final var childId = RESOURCE_ID + "/child";
         when(index.getMapping(childId)).thenReturn(mapping);
@@ -645,7 +645,7 @@ public class OCFLPersistentStorageSessionTest {
         when(((CreateResourceOperation) rdfSourceOperation).getParentId()).thenReturn(RESOURCE_ID);
 
         session2.persist(rdfSourceOperation);
-        session2.commit();
+        session2.commit(USER_PRINCIPAL);
 
         final var session3 = createSession(index, objectSessionFactory);
 
@@ -668,7 +668,7 @@ public class OCFLPersistentStorageSessionTest {
         session.persist(binOperation);
 
         // commit to OCFL
-        session.commit();
+        session.commit(USER_PRINCIPAL);
 
         // create a new session and verify the returned rdf stream.
         final var newSession = createSession(index, objectSessionFactory);
@@ -688,7 +688,7 @@ public class OCFLPersistentStorageSessionTest {
         session.persist(binOperation);
 
         // commit to OCFL
-        session.commit();
+        session.commit(USER_PRINCIPAL);
 
         try {
             session.getBinaryContent(RESOURCE_ID, null);
@@ -709,7 +709,7 @@ public class OCFLPersistentStorageSessionTest {
         // perform the create non-rdf source operation
         session.persist(binOperation);
         // commit to OCFL
-        session.commit();
+        session.commit(USER_PRINCIPAL);
 
         // create a new session and verify that the state is the same
         final var newSession = createSession(index, objectSessionFactory);

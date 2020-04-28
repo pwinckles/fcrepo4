@@ -94,7 +94,7 @@ public class RepositoryInitializer {
                         BASIC_CONTAINER.getURI()).parentId(FEDORA_ID_PREFIX).triples(repositoryRootStream).build();
 
                 session.persist(operation);
-                session.commit();
+                session.commit("fedoraAdmin");
                 LOGGER.info("Successfully create repository root ({}).", FEDORA_ID_PREFIX);
             }
 

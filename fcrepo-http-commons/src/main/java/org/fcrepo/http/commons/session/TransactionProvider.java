@@ -54,6 +54,8 @@ public class TransactionProvider implements Factory<Transaction> {
 
     private final URI baseUri;
 
+    private final String userPrincipal;
+
     /**
      * Create a new transaction provider for a request
      * @param txManager the transaction manager
@@ -61,11 +63,12 @@ public class TransactionProvider implements Factory<Transaction> {
      * @param baseUri base uri for the application
      */
     public TransactionProvider(final TransactionManager txManager, final HttpServletRequest request,
-            final URI baseUri) {
+            final URI baseUri, final String userPrincipal) {
         this.txManager = txManager;
         this.request = request;
         this.txIdPattern = Pattern.compile("(^|" + baseUri + TX_PREFIX + ")([0-9a-f\\-]+)$");
         this.baseUri = baseUri;
+        this.userPrincipal = userPrincipal;
     }
 
     @Override
@@ -120,6 +123,7 @@ public class TransactionProvider implements Factory<Transaction> {
             final var transaction = txManager.create();
             transaction.setUserAgent(request.getHeader("user-agent"));
             transaction.setBaseUri(resolveBaseUri());
+            transaction.setUserPrincipal(userPrincipal);
             return transaction;
         }
     }

@@ -113,4 +113,6 @@ public interface Transaction {
      */
     void setUserAgent(String userAgent);
 
+    void setUserPrincipal(String userPrincipal);
+
 }

@@ -25,8 +25,7 @@ import static org.fcrepo.persistence.common.ResourceHeaderUtils.populateBinaryHe
 import static org.fcrepo.persistence.common.ResourceHeaderUtils.populateExternalBinaryHeaders;
 import static org.fcrepo.persistence.common.ResourceHeaderUtils.touchCreationHeaders;
 import static org.fcrepo.persistence.common.ResourceHeaderUtils.touchModificationHeaders;
-import static org.fcrepo.persistence.ocfl.impl.OCFLPersistentStorageUtils.relativizeSubpath;
-import static org.fcrepo.persistence.ocfl.impl.OCFLPersistentStorageUtils.resolveOCFLSubpath;
+import static org.fcrepo.persistence.ocfl.impl.OCFLPersistentStorageUtils.resovleOCFLSubpathFromResourceId;
 
 import java.io.InputStream;
 
@@ -75,9 +74,11 @@ abstract class AbstractNonRdfSourcePersister extends AbstractPersister {
     protected void persistNonRDFSource(final ResourceOperation operation,
                                        final OCFLObjectSession objectSession, final String rootIdentifier)
             throws PersistentStorageException {
+        final var isVanilla = objectSession.isVanillaObject();
         final var resourceId = operation.getResourceId();
-        final var fedoraSubpath = relativizeSubpath(rootIdentifier, resourceId);
-        final var subpath = resolveOCFLSubpath(rootIdentifier, fedoraSubpath);
+
+        final String subpath = resovleOCFLSubpathFromResourceId(isVanilla, rootIdentifier, resourceId);
+
         log.debug("persisting ({}) to {}", resourceId, subpath);
         // write user content
         final var nonRdfSourceOperation = (NonRdfSourceOperation) operation;
@@ -107,10 +108,12 @@ abstract class AbstractNonRdfSourcePersister extends AbstractPersister {
             }
         }
 
-        // Write resource headers
-        final var headers = populateHeaders(objectSession, subpath, nonRdfSourceOperation, outcome,
-                fedoraSubpath == "");
-        writeHeaders(objectSession, headers, subpath);
+        if (!isVanilla) {
+            // Write resource headers
+            final var headers = populateHeaders(objectSession, subpath, nonRdfSourceOperation, outcome,
+                    resourceId.equals(rootIdentifier));
+            writeHeaders(objectSession, headers, subpath);
+        }
     }
 
     /**

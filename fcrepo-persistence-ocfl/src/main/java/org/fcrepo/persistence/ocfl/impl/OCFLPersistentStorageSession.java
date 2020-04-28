@@ -187,8 +187,9 @@ public class OCFLPersistentStorageSession implements PersistentStorageSession {
 
         final FedoraOCFLMapping mapping = getFedoraOCFLMapping(identifier);
         final OCFLObjectSession objSession = findOrCreateSession(mapping.getOcflObjectId());
+        final var isVanilla = objSession.isVanillaObject();
         final var rootIdentifier = mapping.getRootObjectIdentifier();
-        final var ocflSubpath = resovleOCFLSubpathFromResourceId(rootIdentifier, identifier);
+        final var ocflSubpath = resovleOCFLSubpathFromResourceId(isVanilla, rootIdentifier, identifier);
         final var sidecarSubpath = getSidecarSubpath(ocflSubpath);
         String versionId = null;
 
@@ -196,7 +197,10 @@ public class OCFLPersistentStorageSession implements PersistentStorageSession {
             versionId = resolveVersionId(objSession, version);
         }
 
-        try {
+        if (isVanilla) {
+            final var subpath = OCFLPersistentStorageUtils.relativizeSubpath(rootIdentifier, identifier);
+            return objSession.readResourceHeaders(subpath, versionId);
+        } else {
             final InputStream headerStream;
             if (version != null) {
                 headerStream = objSession.read(sidecarSubpath, versionId);
@@ -205,10 +209,6 @@ public class OCFLPersistentStorageSession implements PersistentStorageSession {
             }
 
             return deserializeHeaders(headerStream);
-        } catch (final PersistentItemNotFoundException e) {
-            // could not find the sidecar file -- attempt to load as a vanilla ocfl object
-            final var subpath = OCFLPersistentStorageUtils.relativizeSubpath(rootIdentifier, identifier);
-            return objSession.readResourceHeaders(subpath, versionId);
         }
     }
 
@@ -228,8 +228,9 @@ public class OCFLPersistentStorageSession implements PersistentStorageSession {
         final var mapping = getFedoraOCFLMapping(identifier);
         final var rootIdentifier = mapping.getRootObjectIdentifier();
         final var objSession = findOrCreateSession(mapping.getOcflObjectId());
-        final var ocflSubpath = resovleOCFLSubpathFromResourceId(rootIdentifier, identifier);
-        final var filePath = resolveExtensions(ocflSubpath, true);
+        final var isVanilla = objSession.isVanillaObject();
+        final var ocflSubpath = resovleOCFLSubpathFromResourceId(isVanilla, rootIdentifier, identifier);
+        final var filePath = resolveExtensions(ocflSubpath, !isVanilla);
         return getRdfStream(identifier, objSession, filePath, version);
     }
 
@@ -237,6 +238,7 @@ public class OCFLPersistentStorageSession implements PersistentStorageSession {
     public List<Instant> listVersions(final String fedoraIdentifier) throws PersistentStorageException {
         final var mapping = getFedoraOCFLMapping(fedoraIdentifier);
         final var objSession = findOrCreateSession(mapping.getOcflObjectId());
+        final var isVanilla = objSession.isVanillaObject();
 
         String subpath = null;
 
@@ -245,7 +247,7 @@ public class OCFLPersistentStorageSession implements PersistentStorageSession {
 
             final var headers = getHeaders(fedoraIdentifier, null);
             subpath = resolveExtensions(
-                    resovleOCFLSubpathFromResourceId(mapping.getRootObjectIdentifier(), fedoraIdentifier),
+                    resovleOCFLSubpathFromResourceId(isVanilla, mapping.getRootObjectIdentifier(), fedoraIdentifier),
                     !NON_RDF_SOURCE.getURI().equals(headers.getInteractionModel())
             );
         }
@@ -261,13 +263,14 @@ public class OCFLPersistentStorageSession implements PersistentStorageSession {
         final var mapping = getFedoraOCFLMapping(identifier);
         final var rootIdentifier = mapping.getRootObjectIdentifier();
         final var objSession = findOrCreateSession(mapping.getOcflObjectId());
-        final var ocflSubpath = resovleOCFLSubpathFromResourceId(rootIdentifier, identifier);
+        final var isVanilla = objSession.isVanillaObject();
+        final var ocflSubpath = resovleOCFLSubpathFromResourceId(isVanilla, rootIdentifier, identifier);
 
         return getBinaryStream(objSession, ocflSubpath, version);
     }
 
     @Override
-    public synchronized void commit() throws PersistentStorageException {
+    public synchronized void commit(final String userPrincipal) throws PersistentStorageException {
         ensureCommitNotStarted();
         if (isReadOnly()) {
             // No changes to commit.
@@ -310,7 +313,7 @@ public class OCFLPersistentStorageSession implements PersistentStorageSession {
 
             //perform commit
             for (final OCFLObjectSession objectSession : sessions) {
-                objectSession.commit();
+                objectSession.commit(userPrincipal);
                 sessionsToRollback.add(objectSession);
             }
 

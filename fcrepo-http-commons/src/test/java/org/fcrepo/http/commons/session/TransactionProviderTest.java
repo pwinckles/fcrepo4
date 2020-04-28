@@ -58,7 +58,7 @@ public class TransactionProviderTest {
     }
 
     private TransactionProvider createProvider(final UriInfo uriInfo) {
-        return new TransactionProvider(transactionManager, request, uriInfo.getBaseUri());
+        return new TransactionProvider(transactionManager, request, uriInfo.getBaseUri(), "fedoraAdmin");
     }
 
     @Test

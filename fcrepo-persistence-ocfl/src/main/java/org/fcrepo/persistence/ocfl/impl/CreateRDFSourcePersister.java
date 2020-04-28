@@ -22,6 +22,7 @@ import org.fcrepo.kernel.api.operations.RdfSourceOperation;
 import org.fcrepo.kernel.api.operations.ResourceOperation;
 import org.fcrepo.persistence.api.exceptions.PersistentItemConflictException;
 import org.fcrepo.persistence.api.exceptions.PersistentStorageException;
+import org.fcrepo.persistence.ocfl.api.FedoraOCFLMappingNotFoundException;
 import org.fcrepo.persistence.ocfl.api.FedoraToOCFLObjectIndex;
 import org.fcrepo.persistence.ocfl.api.OCFLObjectSession;
 import org.slf4j.Logger;
@@ -70,7 +71,14 @@ class CreateRDFSourcePersister extends AbstractRDFSourcePersister {
             rootObjectId = resolveRootObjectId(createResourceOp, session);
         }
 
-        final String ocflObjectId = mintOCFLObjectId(rootObjectId);
+        String ocflObjectId;
+
+        try {
+            ocflObjectId = index.getMapping(rootObjectId).getOcflObjectId();
+        } catch (FedoraOCFLMappingNotFoundException e) {
+            ocflObjectId = mintOCFLObjectId(rootObjectId);
+        }
+
         final OCFLObjectSession ocflObjectSession = session.findOrCreateSession(ocflObjectId);
         persistRDF(ocflObjectSession, operation, rootObjectId);
         index.addMapping(resourceId, rootObjectId, ocflObjectId);

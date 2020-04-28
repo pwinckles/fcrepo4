@@ -118,7 +118,7 @@ public class ResourceFactoryImpl implements ResourceFactory {
                 if (transaction == null) {
                     // Commit session (if read-only) so it doesn't hang around.
                     try {
-                        psSession.commit();
+                        psSession.commit("");
                     } catch (final PersistentStorageException e) {
                         LOGGER.error("Error committing session, message: {}", e.getMessage());
                     }

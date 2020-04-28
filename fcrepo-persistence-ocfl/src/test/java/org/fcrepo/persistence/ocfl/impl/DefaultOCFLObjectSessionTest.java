@@ -872,7 +872,7 @@ public class DefaultOCFLObjectSessionTest {
     private String commit(final DefaultOCFLObjectSession session, final CommitOption option)
             throws PersistentStorageException {
         session.setCommitOption(option);
-        return session.commit();
+        return session.commit("user");
     }
 
 }

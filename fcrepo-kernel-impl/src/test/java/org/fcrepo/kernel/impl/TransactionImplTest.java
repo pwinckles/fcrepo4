@@ -51,6 +51,8 @@ import org.mockito.junit.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.Silent.class)
 public class TransactionImplTest {
 
+    private static final String USER = "fedoraAdmin";
+
     private TransactionImpl testTx;
 
     @Mock
@@ -75,6 +77,7 @@ public class TransactionImplTest {
         when(txManager.getContainmentIndex()).thenReturn(containmentIndex);
         when(txManager.getEventAccumulator()).thenReturn(eventAccumulator);
         testTx = new TransactionImpl("123", txManager);
+        testTx.setUserPrincipal(USER);
     }
 
     @Test
@@ -96,21 +99,21 @@ public class TransactionImplTest {
     @Test
     public void testCommit() throws Exception {
         testTx.commit();
-        verify(psSession).commit();
+        verify(psSession).commit(USER);
     }
 
     @Test
     public void testCommitIfShortLived() throws Exception {
         testTx.setShortLived(true);
         testTx.commitIfShortLived();
-        verify(psSession).commit();
+        verify(psSession).commit(USER);
     }
 
     @Test
     public void testCommitIfShortLivedOnNonShortLived() throws Exception {
         testTx.setShortLived(false);
         testTx.commitIfShortLived();
-        verify(psSession, never()).commit();
+        verify(psSession, never()).commit(USER);
     }
 
     @Test(expected = TransactionRuntimeException.class)
@@ -119,7 +122,7 @@ public class TransactionImplTest {
         try {
             testTx.commit();
         } finally {
-            verify(psSession, never()).commit();
+            verify(psSession, never()).commit(USER);
         }
     }
 
@@ -129,17 +132,17 @@ public class TransactionImplTest {
         try {
             testTx.commit();
         } finally {
-            verify(psSession, never()).commit();
+            verify(psSession, never()).commit(USER);
         }
     }
 
     @Test(expected = RepositoryRuntimeException.class)
     public void testEnsureRollbackOnFailedCommit() throws Exception {
-        doThrow(new PersistentStorageException("Failed")).when(psSession).commit();
+        doThrow(new PersistentStorageException("Failed")).when(psSession).commit(USER);
         try {
             testTx.commit();
         } finally {
-            verify(psSession).commit();
+            verify(psSession).commit(USER);
             verify(psSession).rollback();
         }
     }
@@ -148,7 +151,7 @@ public class TransactionImplTest {
     public void testCommitAlreadyCommittedTx() throws Exception {
         testTx.commit();
         testTx.commit();
-        verify(psSession, times(1)).commit();
+        verify(psSession, times(1)).commit(USER);
     }
 
     @Test

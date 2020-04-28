@@ -125,12 +125,15 @@ public class IndexBuilderImpl implements IndexBuilder {
                     if (fedoraIds.isEmpty()) {
                         final var fedoraId = FedoraId.create(ocflId);
                         fedoraToOCFLObjectIndex.addMapping(fedoraId.getFullId(), fedoraId.getFullId(), ocflId);
+                        containmentIndex.addContainedBy(txId, FedoraId.getRepositoryRootId(), fedoraId);
 
                         // TODO this is missing paths that once existed but are not currently in HEAD
                         try (final var vanillaPaths = objSession.listHeadSubpaths()) {
                             vanillaPaths.forEach(path -> {
-                                fedoraToOCFLObjectIndex.addMapping(fedoraId.resolve(path).getFullId(),
+                                final var childId = fedoraId.resolve(path);
+                                fedoraToOCFLObjectIndex.addMapping(childId.getFullId(),
                                         fedoraId.getFullId(), ocflId);
+                                containmentIndex.addContainedBy(txId, fedoraId, childId);
                             });
                         }
                     } else {

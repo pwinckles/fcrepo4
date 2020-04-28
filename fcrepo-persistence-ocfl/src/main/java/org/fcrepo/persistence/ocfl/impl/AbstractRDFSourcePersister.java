@@ -18,6 +18,7 @@
 package org.fcrepo.persistence.ocfl.impl;
 
 import org.fcrepo.kernel.api.models.ResourceHeaders;
+import org.fcrepo.kernel.api.operations.CreateRdfSourceOperation;
 import org.fcrepo.kernel.api.operations.CreateResourceOperation;
 import org.fcrepo.kernel.api.operations.RdfSourceOperation;
 import org.fcrepo.kernel.api.operations.ResourceOperation;
@@ -30,12 +31,13 @@ import org.fcrepo.persistence.ocfl.api.OCFLObjectSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.fcrepo.kernel.api.RdfLexicon.FEDORA_NON_RDF_SOURCE_DESCRIPTION_URI;
 import static org.fcrepo.kernel.api.operations.ResourceOperationType.CREATE;
 import static org.fcrepo.persistence.common.ResourceHeaderUtils.newResourceHeaders;
 import static org.fcrepo.persistence.common.ResourceHeaderUtils.touchCreationHeaders;
 import static org.fcrepo.persistence.common.ResourceHeaderUtils.touchModificationHeaders;
-import static org.fcrepo.persistence.ocfl.impl.OCFLPersistentStorageUtils.relativizeSubpath;
-import static org.fcrepo.persistence.ocfl.impl.OCFLPersistentStorageUtils.resolveOCFLSubpath;
+import static org.fcrepo.persistence.ocfl.impl.OCFLPersistentStorageUtils.resolveExtensions;
+import static org.fcrepo.persistence.ocfl.impl.OCFLPersistentStorageUtils.resovleOCFLSubpathFromResourceId;
 import static org.fcrepo.persistence.ocfl.impl.OCFLPersistentStorageUtils.writeRDF;
 
 /**
@@ -70,14 +72,25 @@ abstract class AbstractRDFSourcePersister extends AbstractPersister {
         final RdfSourceOperation rdfSourceOp = (RdfSourceOperation)operation;
         log.debug("persisting RDFSource ({}) to OCFL", operation.getResourceId());
 
-        final String subpath = relativizeSubpath(rootId, operation.getResourceId());
-        final String resolvedSubpath = resolveOCFLSubpath(rootId, subpath);
-        //write user triples
-        final var outcome = writeRDF(session, rdfSourceOp.getTriples(), resolvedSubpath);
+        final var isVanilla = session.isVanillaObject();
 
-        // Write resource headers
-        final var headers = populateHeaders(session, resolvedSubpath, rdfSourceOp, outcome, subpath == "");
-        writeHeaders(session, headers, resolvedSubpath);
+        if (isVanilla && rdfSourceOp instanceof CreateRdfSourceOperation &&
+                FEDORA_NON_RDF_SOURCE_DESCRIPTION_URI.equals(
+                        ((CreateRdfSourceOperation) rdfSourceOp).getInteractionModel())) {
+            return;
+        }
+
+        final String subpath = resovleOCFLSubpathFromResourceId(isVanilla, rootId, operation.getResourceId());
+
+        //write user triples
+        final var outcome = writeRDF(session, rdfSourceOp.getTriples(), resolveExtensions(subpath, !isVanilla));
+
+        if (!isVanilla) {
+            // Write resource headers
+            final var headers = populateHeaders(session, subpath, rdfSourceOp, outcome,
+                    rootId.equals(operation.getResourceId()));
+            writeHeaders(session, headers, subpath);
+        }
     }
 
     /**

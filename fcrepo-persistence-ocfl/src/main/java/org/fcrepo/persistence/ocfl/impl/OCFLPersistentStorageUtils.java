@@ -27,7 +27,6 @@ import org.apache.jena.riot.RDFFormat;
 import org.apache.jena.riot.system.StreamRDF;
 import org.fcrepo.kernel.api.FedoraTypes;
 import org.fcrepo.kernel.api.RdfStream;
-import org.fcrepo.kernel.api.exception.RepositoryRuntimeException;
 import org.fcrepo.kernel.api.rdf.DefaultRdfStream;
 import org.fcrepo.persistence.api.WriteOutcome;
 import org.fcrepo.persistence.api.exceptions.PersistentItemNotFoundException;
@@ -93,10 +92,17 @@ public class OCFLPersistentStorageUtils {
      * @param fedoraResourceId   The identifier of the resource whose subpath you wish to resolve.
      * @return The resolved OCFL subpath
      */
-    public static String resovleOCFLSubpathFromResourceId(final String rootFedoraObjectId,
-                                                          final String fedoraResourceId) {
+    public static String resovleOCFLSubpathFromResourceId(
+            final boolean isVanilla,
+            final String rootFedoraObjectId,
+            final String fedoraResourceId) {
         final var fedoraSubpath = relativizeSubpath(rootFedoraObjectId, fedoraResourceId);
-        return resolveOCFLSubpath(rootFedoraObjectId, fedoraSubpath);
+
+        if (!isVanilla) {
+            return resolveOCFLSubpath(rootFedoraObjectId, fedoraSubpath);
+        }
+
+        return fedoraSubpath;
     }
 
     /**
@@ -201,7 +207,7 @@ public class OCFLPersistentStorageUtils {
             streamRDF.finish();
 
             final var is = new ByteArrayInputStream(os.toByteArray());
-            final var outcome = session.write(resolveExtensions(subpath, true), is);
+            final var outcome = session.write(subpath, is);
             log.debug("wrote {} to {}", subpath, session);
             return outcome;
         } catch (final IOException ex) {
@@ -353,28 +359,28 @@ public class OCFLPersistentStorageUtils {
      * @return The OCFL ID
      */
     public static String mintOCFLObjectId(final String fedoraIdentifier) {
-        //TODO make OCFL Object Id minting more configurable.
-        String bareFedoraIdentifier = fedoraIdentifier;
-        if (fedoraIdentifier.indexOf(FEDORA_ID_PREFIX) == 0) {
-            bareFedoraIdentifier = fedoraIdentifier.substring(FEDORA_ID_PREFIX.length());
-        }
-        // strip any leading slashes
-        bareFedoraIdentifier = bareFedoraIdentifier.replaceFirst("\\/", "");
-
-        //ensure no accidental collisions with the root ocfl identifier
-        if (bareFedoraIdentifier.equals(DEFAULT_REPOSITORY_ROOT_OCFL_OBJECT_ID)) {
-            throw new RepositoryRuntimeException(bareFedoraIdentifier + " is a reserved identifier");
-        }
-
-        bareFedoraIdentifier = bareFedoraIdentifier.replace("/", "_");
-
-        if (bareFedoraIdentifier.length() == 0) {
-            bareFedoraIdentifier = DEFAULT_REPOSITORY_ROOT_OCFL_OBJECT_ID;
-        }
-
-        log.debug("minted new ocfl object id:  {}", bareFedoraIdentifier);
-
-        return bareFedoraIdentifier;
+        return fedoraIdentifier;
+//        String bareFedoraIdentifier = fedoraIdentifier;
+//        if (fedoraIdentifier.indexOf(FEDORA_ID_PREFIX) == 0) {
+//            bareFedoraIdentifier = fedoraIdentifier.substring(FEDORA_ID_PREFIX.length());
+//        }
+//        // strip any leading slashes
+//        bareFedoraIdentifier = bareFedoraIdentifier.replaceFirst("\\/", "");
+//
+//        //ensure no accidental collisions with the root ocfl identifier
+//        if (bareFedoraIdentifier.equals(DEFAULT_REPOSITORY_ROOT_OCFL_OBJECT_ID)) {
+//            throw new RepositoryRuntimeException(bareFedoraIdentifier + " is a reserved identifier");
+//        }
+//
+//        bareFedoraIdentifier = bareFedoraIdentifier.replace("/", "_");
+//
+//        if (bareFedoraIdentifier.length() == 0) {
+//            bareFedoraIdentifier = DEFAULT_REPOSITORY_ROOT_OCFL_OBJECT_ID;
+//        }
+//
+//        log.debug("minted new ocfl object id:  {}", bareFedoraIdentifier);
+//
+//        return bareFedoraIdentifier;
     }
 
     /**

@@ -100,7 +100,7 @@ public interface PersistentStorageSession {
      * Commits any changes in the current sesssion to persistent storage.
      * @throws PersistentStorageException Error during commit.
      */
-    public void commit() throws PersistentStorageException;
+    public void commit(String userPrincipal) throws PersistentStorageException;
 
     /**
      * Rolls back any changes in the current session.

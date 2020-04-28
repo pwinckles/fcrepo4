@@ -113,7 +113,7 @@ public class IndexBuilderImplTest {
         createResource(session, resource1, true);
         createChildResource(session, resource1, resource2);
 
-        session.commit();
+        session.commit("fedoraAdmin");
 
         assertHasOcflId("resource1", resource1);
         assertHasOcflId("resource1", resource2);
@@ -142,7 +142,7 @@ public class IndexBuilderImplTest {
         createResource(session, resource1, false);
         createChildResource(session, resource1, resource2);
 
-        session.commit();
+        session.commit("fedoraAdmin");
 
         assertHasOcflId("resource1", resource1);
         assertHasOcflId("resource1_resource2", resource2);
