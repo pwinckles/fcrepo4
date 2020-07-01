@@ -24,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.DefaultResourceLoader;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.datasource.init.DatabasePopulatorUtils;
@@ -100,10 +101,17 @@ public class DbFedoraToOcflObjectIndex implements FedoraToOcflObjectIndex {
 
     @Override
     public FedoraOCFLMapping addMapping(final String fedoraId, final String fedoraRootId, final String ocflId) {
-        jdbcTemplate.update(INSERT_MAPPING, Map.of(
-                "fedoraId", fedoraId,
-                "fedoraRootId", fedoraRootId,
-                "ocflId", ocflId));
+        try {
+            jdbcTemplate.update(INSERT_MAPPING, Map.of(
+                    "fedoraId", fedoraId,
+                    "fedoraRootId", fedoraRootId,
+                    "ocflId", ocflId));
+        } catch (DuplicateKeyException e) {
+            throw new IllegalStateException(String.format(
+                    "Cannot add mapping {fedoraId=%s; fedoraRootId=%s; ocflId=%s} because" +
+                            " a mapping for %s already exists.",
+                    fedoraId, fedoraRootId, ocflId, fedoraId));
+        }
         return new FedoraOCFLMapping(fedoraRootId, ocflId);
     }
 
