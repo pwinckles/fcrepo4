@@ -116,10 +116,13 @@ public class ReferenceServiceImpl implements ReferenceService {
             OPERATION_COLUMN + " = 'add') x WHERE NOT EXISTS (SELECT 1 FROM " + TRANSACTION_TABLE + " WHERE " +
             RESOURCE_COLUMN + " = :resourceId AND " + OPERATION_COLUMN + " = 'delete')";
 
-    private static final String INSERT_REFERENCE_IN_TRANSACTION = "INSERT INTO " + TRANSACTION_TABLE + "(" +
-            RESOURCE_COLUMN + ", " + SUBJECT_COLUMN + ", " + PROPERTY_COLUMN + ", " + TARGET_COLUMN + ", " +
-            TRANSACTION_COLUMN + ", " + OPERATION_COLUMN + ") VALUES (:resourceId, :subjectId, :property, :targetId, " +
-            ":transactionId, 'add')";
+//    private static final String INSERT_REFERENCE_IN_TRANSACTION = "INSERT INTO " + TRANSACTION_TABLE + "(" +
+//            RESOURCE_COLUMN + ", " + SUBJECT_COLUMN + ", " + PROPERTY_COLUMN + ", " + TARGET_COLUMN + ", " +
+//            TRANSACTION_COLUMN + ", " + OPERATION_COLUMN + ") VALUES (:resourceId, :subjectId, :property, :targetId, " +
+//            ":transactionId, 'add')";
+    private static final String INSERT_REFERENCE_IN_TRANSACTION = "INSERT INTO " + TABLE_NAME + "(" +
+            RESOURCE_COLUMN + ", " + SUBJECT_COLUMN + ", " + PROPERTY_COLUMN + ", " + TARGET_COLUMN +
+            ") VALUES (:resourceId, :subjectId, :property, :targetId)";
 
     private static final String UNDO_INSERT_REFERENCE_IN_TRANSACTION = "DELETE FROM " + TRANSACTION_TABLE + " WHERE " +
             RESOURCE_COLUMN + " = :resourceId AND " + SUBJECT_COLUMN + " = :subjectId AND " + PROPERTY_COLUMN +
@@ -197,15 +200,15 @@ public class ReferenceServiceImpl implements ReferenceService {
                         NodeFactory.createURI(rs.getString(PROPERTY_COLUMN)),
                         targetNode);
 
-        final List<Triple> references;
-        if (txId != null) {
-            // we are in a transaction
-            parameterSource.addValue("transactionId", txId);
-            references = jdbcTemplate.query(SELECT_INBOUND_IN_TRANSACTION, parameterSource, inboundMapper);
-        } else {
-            // not in a transaction
-            references = jdbcTemplate.query(SELECT_INBOUND, parameterSource, inboundMapper);
-        }
+        final List<Triple> references = jdbcTemplate.query(SELECT_INBOUND, parameterSource, inboundMapper);;
+//        if (txId != null) {
+//            // we are in a transaction
+//            parameterSource.addValue("transactionId", txId);
+//            references = jdbcTemplate.query(SELECT_INBOUND_IN_TRANSACTION, parameterSource, inboundMapper);
+//        } else {
+//            // not in a transaction
+//            references = jdbcTemplate.query(SELECT_INBOUND, parameterSource, inboundMapper);
+//        }
         LOGGER.debug("getInboundReferences for {} in transaction {} found {} references",
                 targetId, txId, references.size());
         return references.stream();
@@ -240,15 +243,15 @@ public class ReferenceServiceImpl implements ReferenceService {
                         NodeFactory.createURI(rs.getString(PROPERTY_COLUMN)),
                         NodeFactory.createURI(rs.getString(TARGET_COLUMN)));
 
-        final List<Quad> references;
-        if (txId != null) {
-            // we are in a transaction
-            parameterSource.addValue("transactionId", txId);
-            references = jdbcTemplate.query(SELECT_OUTBOUND_IN_TRANSACTION, parameterSource, outboundMapper);
-        } else {
-            // not in a transaction
-            references = jdbcTemplate.query(SELECT_OUTBOUND, parameterSource, outboundMapper);
-        }
+        final List<Quad> references = jdbcTemplate.query(SELECT_OUTBOUND, parameterSource, outboundMapper);;
+//        if (txId != null) {
+//            // we are in a transaction
+//            parameterSource.addValue("transactionId", txId);
+//            references = jdbcTemplate.query(SELECT_OUTBOUND_IN_TRANSACTION, parameterSource, outboundMapper);
+//        } else {
+//            // not in a transaction
+//            references = jdbcTemplate.query(SELECT_OUTBOUND, parameterSource, outboundMapper);
+//        }
         LOGGER.debug("getOutboundReferences for {} in transaction {} found {} references",
                 resourceId, txId, references.size());
         return references;
@@ -286,26 +289,26 @@ public class ReferenceServiceImpl implements ReferenceService {
     @Override
     @Transactional
     public void commitTransaction(final String txId) {
-        try {
-            final Map<String, String> parameterSource = Map.of("transactionId", txId);
-            jdbcTemplate.update(COMMIT_DELETE_RECORDS, parameterSource);
-            jdbcTemplate.update(COMMIT_ADD_RECORDS, parameterSource);
-            jdbcTemplate.update(DELETE_TRANSACTION, parameterSource);
-        } catch (final Exception e) {
-            LOGGER.warn("Unable to commit reference index transaction {}: {}", txId, e.getMessage());
-            throw new RepositoryRuntimeException("Unable to commit reference index transaction", e);
-        }
+//        try {
+//            final Map<String, String> parameterSource = Map.of("transactionId", txId);
+//            jdbcTemplate.update(COMMIT_DELETE_RECORDS, parameterSource);
+//            jdbcTemplate.update(COMMIT_ADD_RECORDS, parameterSource);
+//            jdbcTemplate.update(DELETE_TRANSACTION, parameterSource);
+//        } catch (final Exception e) {
+//            LOGGER.warn("Unable to commit reference index transaction {}: {}", txId, e.getMessage());
+//            throw new RepositoryRuntimeException("Unable to commit reference index transaction", e);
+//        }
     }
 
     @Override
     public void rollbackTransaction(final String txId) {
-        try {
-            final Map<String, String> parameterSource = Map.of("transactionId", txId);
-            jdbcTemplate.update(DELETE_TRANSACTION, parameterSource);
-        } catch (final Exception e) {
-            LOGGER.warn("Unable to rollback reference index transaction {}: {}", txId, e.getMessage());
-            throw new RepositoryRuntimeException("Unable to rollback reference index transaction", e);
-        }
+//        try {
+//            final Map<String, String> parameterSource = Map.of("transactionId", txId);
+//            jdbcTemplate.update(DELETE_TRANSACTION, parameterSource);
+//        } catch (final Exception e) {
+//            LOGGER.warn("Unable to rollback reference index transaction {}: {}", txId, e.getMessage());
+//            throw new RepositoryRuntimeException("Unable to rollback reference index transaction", e);
+//        }
     }
 
     @Override
@@ -324,18 +327,20 @@ public class ReferenceServiceImpl implements ReferenceService {
      * @param reference the quad with the reference, is Quad(resourceId, subjectId, propertyId, targetId)
      */
     private void removeReference(@Nonnull final String txId, final Quad reference) {
-        final Map<String, String> parameterSource = Map.of("transactionId", txId,
+        final Map<String, String> parameterSource = Map.of(
                 "resourceId", reference.getGraph().getURI(),
                 "subjectId", reference.getSubject().getURI(),
                 "property", reference.getPredicate().getURI(),
                 "targetId", reference.getObject().getURI());
-        final boolean addedInTx = !jdbcTemplate.queryForList(IS_REFERENCE_ADDED_IN_TRANSACTION, parameterSource)
-                .isEmpty();
-        if (addedInTx) {
-            jdbcTemplate.update(UNDO_INSERT_REFERENCE_IN_TRANSACTION, parameterSource);
-        } else {
-            jdbcTemplate.update(DELETE_REFERENCE_IN_TRANSACTION, parameterSource);
-        }
+        jdbcTemplate.update("DELETE FROM reference WHERE fedora_id = :resourceId AND subject_id = :subjectId" +
+                " AND property = :property AND target_id = :targetId", parameterSource);
+//        final boolean addedInTx = !jdbcTemplate.queryForList(IS_REFERENCE_ADDED_IN_TRANSACTION, parameterSource)
+//                .isEmpty();
+//        if (addedInTx) {
+//            jdbcTemplate.update(UNDO_INSERT_REFERENCE_IN_TRANSACTION, parameterSource);
+//        } else {
+//            jdbcTemplate.update(DELETE_REFERENCE_IN_TRANSACTION, parameterSource);
+//        }
     }
 
     /**
@@ -346,19 +351,21 @@ public class ReferenceServiceImpl implements ReferenceService {
      */
     private void addReference(@Nonnull final String txId, final Quad reference, final String userPrincipal) {
         final String targetId = reference.getObject().getURI();
-        final Map<String, String> parameterSource = Map.of("transactionId", txId,
+        final Map<String, String> parameterSource = Map.of(
                 "resourceId", reference.getGraph().getURI(),
                 "subjectId", reference.getSubject().getURI(),
                 "property", reference.getPredicate().getURI(),
                 "targetId", targetId);
-        final boolean addedInTx = !jdbcTemplate.queryForList(IS_REFERENCE_DELETED_IN_TRANSACTION, parameterSource)
-                .isEmpty();
-        if (addedInTx) {
-            jdbcTemplate.update(UNDO_DELETE_REFERENCE_IN_TRANSACTION, parameterSource);
-        } else {
-            jdbcTemplate.update(INSERT_REFERENCE_IN_TRANSACTION, parameterSource);
-            recordEvent(txId, targetId, userPrincipal);
-        }
+        jdbcTemplate.update(INSERT_REFERENCE_IN_TRANSACTION, parameterSource);
+        recordEvent(txId, targetId, userPrincipal);
+//        final boolean addedInTx = !jdbcTemplate.queryForList(IS_REFERENCE_DELETED_IN_TRANSACTION, parameterSource)
+//                .isEmpty();
+//        if (addedInTx) {
+//            jdbcTemplate.update(UNDO_DELETE_REFERENCE_IN_TRANSACTION, parameterSource);
+//        } else {
+//            jdbcTemplate.update(INSERT_REFERENCE_IN_TRANSACTION, parameterSource);
+//            recordEvent(txId, targetId, userPrincipal);
+//        }
     }
 
     /**
