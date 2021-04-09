@@ -26,6 +26,7 @@ import org.fcrepo.kernel.api.services.ContainmentTriplesService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.stream.Stream;
 
@@ -44,6 +45,7 @@ public class ContainmentTriplesServiceImpl implements ContainmentTriplesService 
     @Qualifier("containmentIndex")
     private ContainmentIndex containmentIndex;
 
+    @Transactional
     @Override
     public Stream<Triple> get(final Transaction tx, final FedoraResource resource) {
         final var fedoraId = resource.getFedoraId();

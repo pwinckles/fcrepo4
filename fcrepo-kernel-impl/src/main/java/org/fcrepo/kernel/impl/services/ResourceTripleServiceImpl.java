@@ -38,6 +38,7 @@ import org.apache.jena.graph.Triple;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Implementation of the ResourceTripleService
@@ -60,6 +61,7 @@ public class ResourceTripleServiceImpl implements ResourceTripleService {
     @Inject
     private MembershipService membershipService;
 
+    @Transactional
     @Override
     public Stream<Triple> getResourceTriples(final Transaction tx, final FedoraResource resource,
                                              final LdpTriplePreferences preferences, final int limit) {

@@ -40,6 +40,7 @@ import org.fcrepo.persistence.api.exceptions.PersistentStorageException;
 import org.fcrepo.persistence.common.MultiDigestInputStreamWrapper;
 import org.slf4j.Logger;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.inject.Inject;
 import javax.ws.rs.BadRequestException;
@@ -79,6 +80,7 @@ public class CreateResourceServiceImpl extends AbstractService implements Create
     @Inject
     private NonRdfSourceOperationFactory nonRdfSourceOperationFactory;
 
+    @Transactional
     @Override
     public void perform(final Transaction tx, final String userPrincipal, final FedoraId fedoraId,
                         final String contentType, final String filename,
@@ -167,6 +169,7 @@ public class CreateResourceServiceImpl extends AbstractService implements Create
         }
     }
 
+    @Transactional
     @Override
     public void perform(final Transaction tx, final String userPrincipal, final FedoraId fedoraId,
             final List<String> linkHeaders, final Model model) {

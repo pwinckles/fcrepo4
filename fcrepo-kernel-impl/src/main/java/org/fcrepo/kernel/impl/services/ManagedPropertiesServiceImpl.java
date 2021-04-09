@@ -43,6 +43,7 @@ import org.fcrepo.kernel.api.models.TimeMap;
 import org.fcrepo.kernel.api.rdf.DefaultRdfStream;
 import org.fcrepo.kernel.api.services.ManagedPropertiesService;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Retrieve the managed properties as triples
@@ -53,6 +54,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class ManagedPropertiesServiceImpl implements ManagedPropertiesService {
 
+    @Transactional
     @Override
     public Stream<Triple> get(final FedoraResource resource) {
         final List<Triple> triples = new ArrayList<>();
